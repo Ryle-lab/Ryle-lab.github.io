@@ -157,7 +157,6 @@
         </div>
       </div>
     </section>
-
     <section id="about">
       <h2>About Me</h2>
       <div class="about-grid">
@@ -171,7 +170,6 @@
         </div>
       </div>
     </section>
-
     <section id="projects">
       <h2>Projects</h2>
       <div class="projects-grid">
@@ -179,19 +177,16 @@
           <img src="IMG_20251016_170758.png" alt="AnimeInfo" onerror="this.src='https://via.placeholder.com/800x450.png?text=Project+1';">
           <div class="proj-info"><h3>AnimeInfo</h3><p>AI-powered anime search & community curation — React, Node.js, AI</p></div>
         </article>
-
         <article class="proj-card tilt-safe">
           <img src="IMG_20251022_080816.jpg" alt="Logic and Switching Theory" onerror="this.src='https://via.placeholder.com/800x450.png?text=Project+2';">
           <div class="proj-info"><h3>Logic & Switching Theory</h3><p>OR-gates activity and visual demos.</p></div>
         </article>
-
         <article class="proj-card tilt-safe">
           <img src="Screenshot_20251022_194013_22e4250240c136c826b8a3b1264b092d.jpg" alt="MLBB Highlights" onerror="this.src='https://via.placeholder.com/800x450.png?text=Project+3';">
           <div class="proj-info"><h3>MLBB Highlights</h3><p>Mobile Legends gameplay highlights — editing & showcase.</p></div>
         </article>
       </div>
-    </section>
-
+    </section
     <section id="skills">
       <h2>Skills</h2>
       <div class="skills-list">
@@ -202,7 +197,6 @@
         <div class="skill"><span>React <strong>60%</strong></span><div class="bar"><div class="fill" style="width:60%"></div></div></div>
       </div>
     </section>
-
     <section id="contact">
       <h2>Contact Me</h2>
       <form class="contact" id="contactForm" novalidate>
