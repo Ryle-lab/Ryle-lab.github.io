@@ -429,4 +429,316 @@
     footer && (footer.innerHTML = `© ${new Date().getFullYear()} Ryle L. De Hitta. Crafted with ❤️ and creativity.`);
   });
   </script>
-  
+  <!-- ------------- 3D Background: Customizable (replace previous Three.js code) ------------- -->
+<style>
+  /* Controls UI */
+  #bg-controls {
+    position: fixed;
+    right: 14px;
+    bottom: 18px;
+    z-index: 220;
+    background: rgba(6,8,18,0.6);
+    border: 1px solid rgba(255,255,255,0.04);
+    backdrop-filter: blur(6px);
+    padding: 10px;
+    border-radius: 12px;
+    color: #e6eef8;
+    font-family: Inter, sans-serif;
+    font-size: 13px;
+    box-shadow: 0 10px 30px rgba(3,6,23,0.6);
+    min-width: 180px;
+  }
+  #bg-controls h4{margin:0 0 8px 0;font-size:13px}
+  .bg-btn {display:block;width:100%;margin:6px 0;padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.03);color:var(--muted);cursor:pointer;text-align:left}
+  .bg-btn.active {background:linear-gradient(90deg,var(--accent-1),var(--accent-2));color:#fff;border:0}
+  #bg-quality {width:100%;margin-top:8px}
+  #bg-controls small{display:block;color:rgba(255,255,255,0.6);margin-top:6px}
+  #bg-upload{display:block;margin-top:8px;width:100%}
+  /* hide on small screens */
+  @media (max-width:760px) { #bg-controls { display:none; } }
+</style>
+
+<div id="bg-controls" aria-hidden="false" role="region" aria-label="Background controls">
+  <h4>Background</h4>
+  <button class="bg-btn" data-preset="cubes" id="btn-cubes">🧊 Rotating Cubes</button>
+  <button class="bg-btn" data-preset="spheres" id="btn-spheres">⚪ Floating Spheres</button>
+  <button class="bg-btn" data-preset="grid" id="btn-grid">🔷 Wireframe Grid</button>
+
+  <label style="margin-top:8px;font-size:12px">Performance</label>
+  <input id="bg-quality" type="range" min="0.25" max="1" step="0.25" value="1" />
+  <small>Quality (lower for smoother on slow devices)</small>
+
+  <label style="margin-top:6px;font-size:12px">Use your own image</label>
+  <input id="bg-upload" type="file" accept="image/*" />
+  <small>Image will be used as a distant background plane</small>
+</div>
+
+<script>
+/*
+  Customizable 3D background using three.js
+  - Presets: cubes, spheres, grid
+  - Upload an image to use as distant background
+  - Quality slider (0.25 - 1)
+  - Auto-disable on mobile (width < 760)
+*/
+
+(function(){
+  // Safety / capability checks
+  if (!window.THREE) {
+    console.warn('Three.js not found — 3D background disabled.');
+    return;
+  }
+
+  const canvas = document.getElementById('bg-3d');
+  if (!canvas) {
+    console.warn('Canvas #bg-3d not found — 3D background disabled.');
+    return;
+  }
+
+  // Mobile fallback: don't init heavy scene on small screens
+  const MOBILE_BREAKPOINT = 760;
+  const isMobile = window.innerWidth < MOBILE_BREAKPOINT || navigator.userAgent.match(/Mobi|Android/i);
+  if (isMobile) {
+    // Hide canvas visually
+    canvas.style.display = 'none';
+    console.info('Mobile device detected — 3D background disabled for performance.');
+    return;
+  }
+
+  // Basic three.js setup
+  const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+  const DPR = Math.min( window.devicePixelRatio || 1, 2 );
+  renderer.setPixelRatio(DPR);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.domElement.style.pointerEvents = 'none'; // clicks pass through
+  renderer.domElement.style.zIndex = -3;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.z = 6;
+
+  // Environment lighting
+  const ambient = new THREE.AmbientLight(0x222233, 0.6);
+  scene.add(ambient);
+  const point = new THREE.PointLight(0x8a63ff, 1.4);
+  point.position.set(6, 6, 6);
+  scene.add(point);
+
+  // Global state
+  let state = {
+    preset: 'cubes',
+    quality: 1,
+    userBgTexture: null
+  };
+
+  // Scene objects holders
+  let objects = [];
+  let planeBg = null;
+
+  // Utility: dispose meshes and geometries
+  function clearObjects(){
+    objects.forEach(obj=>{
+      if(obj.geometry) obj.geometry.dispose();
+      if(obj.material){
+        if (obj.material.map) obj.material.map.dispose();
+        obj.material.dispose();
+      }
+      scene.remove(obj);
+    });
+    objects = [];
+  }
+  function removePlaneBg(){
+    if (planeBg) {
+      if (planeBg.geometry) planeBg.geometry.dispose();
+      if (planeBg.material) {
+        if (planeBg.material.map) planeBg.material.map.dispose();
+        planeBg.material.dispose();
+      }
+      scene.remove(planeBg);
+      planeBg = null;
+    }
+  }
+
+  // Preset builders
+  function buildCubes(count=24){
+    clearObjects();
+    const geo = new THREE.BoxGeometry(1,1,1);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x8a63ff, emissive: 0x120022, metalness: 0.6, roughness: 0.3 });
+    for(let i=0;i<count;i++){
+      const m = new THREE.Mesh(geo.clone(), mat.clone());
+      m.position.set((Math.random()-0.5)*12, (Math.random()-0.5)*6, (Math.random()-0.5)*12);
+      const s = Math.random()*0.7 + 0.25;
+      m.scale.set(s,s,s);
+      m.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+      scene.add(m);
+      objects.push(m);
+    }
+  }
+
+  function buildSpheres(count=180){
+    clearObjects();
+    // small moving spheres (particles-like but real meshes)
+    const geo = new THREE.SphereGeometry(0.08, 12, 12);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xc8caff, emissive: 0x1a1630, metalness: 0.1, roughness: 0.5 });
+    for(let i=0;i<count;i++){
+      const m = new THREE.Mesh(geo.clone(), mat.clone());
+      m.position.set((Math.random()-0.5)*12, (Math.random()-0.5)*8, (Math.random()-0.5)*12);
+      const s = Math.random()*0.9 + 0.2;
+      m.scale.setScalar(s);
+      scene.add(m);
+      objects.push(m);
+      // give each one a random velocity (store on object)
+      m.userData.vel = { x:(Math.random()-0.5)*0.002, y:(Math.random()-0.5)*0.002, z:(Math.random()-0.5)*0.002 };
+    }
+  }
+
+  function buildGrid(size=18, step=1.4){
+    clearObjects();
+    // Wireframe grid made of lines (cheap)
+    const material = new THREE.LineBasicMaterial({ color: 0x7a6df6, opacity: 0.9, transparent: true });
+    const group = new THREE.Group();
+    for(let y=-4;y<=4;y++){
+      const points = [];
+      for(let x=-8;x<=8;x++){
+        points.push(new THREE.Vector3(x*step, y*step*0.45, Math.sin(x+y)*0.4));
+      }
+      const geom = new THREE.BufferGeometry().setFromPoints(points);
+      const line = new THREE.Line(geom, material);
+      group.add(line);
+      objects.push(line);
+      scene.add(line);
+    }
+    // add a rotating pivot for subtle motion
+    objects.push(group);
+    // no need to keep separate variable
+  }
+
+  // Apply state (rebuild scene for preset)
+  function applyPreset(){
+    removePlaneBg();
+    const q = state.quality;
+    if(state.preset === 'cubes'){
+      const count = Math.round(24 * q);
+      buildCubes(Math.max(8, count));
+    } else if(state.preset === 'spheres'){
+      const count = Math.round(180 * q);
+      buildSpheres(Math.max(40, count));
+    } else if(state.preset === 'grid'){
+      buildGrid();
+    }
+  }
+
+  // Add plane background image if user provided
+  function setBackgroundImage(imgUrl){
+    removePlaneBg();
+    if(!imgUrl) return;
+    const texLoader = new THREE.TextureLoader();
+    texLoader.load(imgUrl, (tex)=>{
+      const geom = new THREE.PlaneGeometry(40, 22);
+      const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+      planeBg = new THREE.Mesh(geom, mat);
+      planeBg.position.set(0,0,-20); // far back
+      scene.add(planeBg);
+    }, undefined, (err)=>{ console.warn('bg image load error', err); });
+  }
+
+  // Animation loop (optimized)
+  let last = performance.now();
+  function animate(now){
+    const dt = (now - last) * 0.001;
+    last = now;
+    // rotate/animate objects lightly
+    objects.forEach((o, idx)=>{
+      if (state.preset === 'cubes'){
+        o.rotation.x += 0.0015 + (idx%5)*0.0003;
+        o.rotation.y += 0.002 + (idx%7)*0.00025;
+      } else if(state.preset === 'spheres'){
+        // move spheres by velocity
+        if(o.userData && o.userData.vel){
+          o.position.x += o.userData.vel.x * (1 + dt*60);
+          o.position.y += o.userData.vel.y * (1 + dt*60);
+          o.position.z += o.userData.vel.z * (1 + dt*60);
+          // bounce bounds
+          if(o.position.x < -12 || o.position.x > 12) o.userData.vel.x *= -1;
+          if(o.position.y < -8 || o.position.y > 8) o.userData.vel.y *= -1;
+          if(o.position.z < -12 || o.position.z > 12) o.userData.vel.z *= -1;
+        }
+      } else if(state.preset === 'grid'){
+        // gently rotate whole group if group present
+        // some items may be groups (Three.Group)
+        if (o.type === 'Group') {
+          o.rotation.z += 0.0008;
+          o.rotation.x += 0.0003;
+        }
+      }
+    });
+
+    // subtle camera bob (slow)
+    camera.position.x = Math.sin(now*0.0004) * 0.12;
+    camera.position.y = Math.sin(now*0.0007) * 0.08;
+
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+  }
+
+  // Controls & UI wiring
+  const btnCubes = document.getElementById('btn-cubes');
+  const btnSpheres = document.getElementById('btn-spheres');
+  const btnGrid = document.getElementById('btn-grid');
+  const qSlider = document.getElementById('bg-quality');
+  const upload = document.getElementById('bg-upload');
+
+  function setActiveButton(id){
+    [btnCubes,btnSpheres,btnGrid].forEach(b=>b.classList.remove('active'));
+    const el = document.getElementById(id);
+    el && el.classList.add('active');
+  }
+
+  btnCubes.addEventListener('click', ()=> { state.preset='cubes'; setActiveButton('btn-cubes'); applyPreset(); });
+  btnSpheres.addEventListener('click', ()=> { state.preset='spheres'; setActiveButton('btn-spheres'); applyPreset(); });
+  btnGrid.addEventListener('click', ()=> { state.preset='grid'; setActiveButton('btn-grid'); applyPreset(); });
+
+  qSlider.addEventListener('input', (e)=> {
+    state.quality = parseFloat(e.target.value);
+    // adjust renderer pixel ratio for quality
+    renderer.setPixelRatio(Math.max(0.6, Math.min(DPR * state.quality, 2)));
+    applyPreset();
+  });
+
+  upload.addEventListener('change', (e)=>{
+    const f = e.target.files && e.target.files[0];
+    if(!f) return;
+    const url = URL.createObjectURL(f);
+    state.userBgTexture = url;
+    setBackgroundImage(url);
+  });
+
+  // initialize default
+  setActiveButton('btn-cubes');
+  applyPreset();
+
+  // Start animation loop
+  requestAnimationFrame(animate);
+
+  // Resize handler
+  window.addEventListener('resize', ()=>{
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    // mobile auto-disable at runtime
+    if(window.innerWidth < MOBILE_BREAKPOINT){
+      renderer.domElement.style.display = 'none';
+    } else {
+      renderer.domElement.style.display = '';
+    }
+  });
+
+  // expose for debugging (optional)
+  window._bg3d = {
+    scene, camera, renderer, state, applyPreset, setBackgroundImage
+  };
+
+})();
+</script>
+<!-- ------------- end 3D background code ------------- -->
+
