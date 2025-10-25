@@ -390,4 +390,43 @@
     });
   }
 
-  // ---
+  // ------- Contact form mailto fallback ----------
+  const form = document.getElementById('contactForm');
+  const status = document.getElementById('formStatus');
+  form && form.addEventListener('submit', (e)=>{
+    e.preventDefault();
+    const fd = new FormData(form);
+    const name = fd.get('name')||'';
+    const email = fd.get('email')||'';
+    const message = fd.get('message')||'';
+    const subject = encodeURIComponent('Portfolio contact from ' + name);
+    const body = encodeURIComponent(`Email: ${email}\n\n${message}`);
+    const recipient = 'youremail@example.com';
+    window.location.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
+    status.textContent = 'Opening your mail client...';
+    setTimeout(()=> status.textContent = 'If your mail client did not open, copy this message and email directly.',2500);
+  });
+
+  // ---------- Accessibility: reduce motion & keyboard ----------
+  if(reduce){
+    document.querySelectorAll('.fill').forEach(el => el.style.transition='none');
+  }
+
+  // ensure nav links smooth scroll
+  document.querySelectorAll('a[href^="#"]').forEach(a=>{
+    a.addEventListener('click', function(e){
+      const target = document.querySelector(this.getAttribute('href'));
+      if(target){
+        e.preventDefault();
+        target.scrollIntoView({behavior:'smooth',block:'start'});
+      }
+    });
+  });
+
+  // Set copyright year
+  document.addEventListener('DOMContentLoaded', ()=> {
+    const footer = document.querySelector('footer');
+    footer && (footer.innerHTML = `© ${new Date().getFullYear()} Ryle L. De Hitta. Crafted with ❤️ and creativity.`);
+  });
+  </script>
+  
