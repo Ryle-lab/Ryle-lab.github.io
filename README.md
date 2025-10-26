@@ -735,4 +735,291 @@
 })();
 </script>
 <!-- ------------- end 3D background code ------------- -->
+<!-- ===== Galaxy 3D Environment (replace previous 3D code) ===== -->
+<style>
+  /* Minimal controls UI (desktop only) */
+  #bg-controls { position: fixed; right: 14px; bottom: 18px; z-index: 240;
+    background: rgba(6,8,18,0.6); border:1px solid rgba(255,255,255,0.03);
+    backdrop-filter: blur(6px); padding:10px; border-radius:12px; color:#e6eef8;
+    font-family: Inter, sans-serif; font-size:13px; box-shadow:0 10px 30px rgba(3,6,23,0.6); min-width:180px;
+  }
+  #bg-controls h4{margin:0 0 8px 0;font-size:13px}
+  .bg-row{display:flex;gap:6px}
+  .bg-btn{flex:1;padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.03);color:var(--muted);cursor:pointer}
+  .bg-btn.active{background:linear-gradient(90deg,var(--accent-1),var(--accent-2));color:#fff;border:0}
+  #bg-quality{width:100%;margin-top:8px}
+  #bg-upload{display:block;margin-top:8px;width:100%}
+  #bg-controls small{display:block;color:rgba(255,255,255,0.6);margin-top:6px}
+  @media (max-width:760px){ #bg-controls{display:none} canvas#bg-3d{display:none} }
+</style>
+
+<div id="bg-controls" aria-hidden="false" role="region" aria-label="Background controls">
+  <h4>Background • Galaxy</h4>
+  <div style="margin-bottom:6px">Preset</div>
+  <div class="bg-row">
+    <button class="bg-btn active" id="preset-galaxy">Galaxy</button>
+    <button class="bg-btn" id="preset-minimal">Minimal</button>
+  </div>
+  <label style="margin-top:8px;font-size:12px">Quality</label>
+  <input id="bg-quality" type="range" min="0.25" max="1" step="0.25" value="1" />
+  <label style="margin-top:8px;font-size:12px">Upload nebula image</label>
+  <input id="bg-upload" type="file" accept="image/*" />
+  <small>Image used as distant nebula plane. (Optional)</small>
+</div>
+
+<script>
+/* Galaxy environment for #bg-3d canvas
+   - layered nebula planes (canvas textures) + performant stars (Points)
+   - gentle parallax & camera motion
+   - mobile auto-disable
+   Paste under body, replace any old Three.js background code.
+*/
+(function(){
+  if (!window.THREE) { console.warn('Three.js required. Include it before this script.'); return; }
+  const canvas = document.getElementById('bg-3d');
+  if (!canvas) { console.warn('#bg-3d canvas not found — add <canvas id="bg-3d"></canvas> to your HTML'); return; }
+
+  // Mobile safety
+  const MOBILE_BREAKPOINT = 760;
+  const isMobile = window.innerWidth < MOBILE_BREAKPOINT || /Mobi|Android/i.test(navigator.userAgent);
+  if (isMobile) {
+    canvas.style.display = 'none';
+    console.info('Mobile detected — galaxy background disabled for performance.');
+    return;
+  }
+
+  // Renderer
+  const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.domElement.style.zIndex = -3;
+  renderer.domElement.style.pointerEvents = 'none';
+
+  // Scene & Camera
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.z = 6;
+
+  // Lights
+  const amb = new THREE.AmbientLight(0xaaaaaa, 0.35);
+  scene.add(amb);
+  const key = new THREE.PointLight(0xc5b8ff, 1.2, 80);
+  key.position.set(5, 6, 4);
+  scene.add(key);
+
+  // ---------- Nebula planes (canvas textures) ----------
+  // helper: create blurred radial gradient canvas texture
+  function makeNebulaCanvas(w=1024,h=512, colorStops){
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+    // clear
+    ctx.clearRect(0,0,w,h);
+    // draw multiple radial gradients
+    colorStops.forEach(cs => {
+      const grd = ctx.createRadialGradient(cs.x*w, cs.y*h, 0, cs.x*w, cs.y*h, Math.max(w,h)*cs.radius);
+      grd.addColorStop(0, cs.colorInner);
+      grd.addColorStop(0.25, cs.colorMid);
+      grd.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.rect(0,0,w,h);
+      ctx.fill();
+    });
+    return c;
+  }
+
+  // default nebula color layers
+  const defaultNebulaLayers = [
+    [{ x:0.25,y:0.4, radius:0.9, colorInner:'rgba(150,120,255,0.9)', colorMid:'rgba(120,90,220,0.25)'},
+     { x:0.7,y:0.5, radius:0.8, colorInner:'rgba(200,150,255,0.6)', colorMid:'rgba(120,80,220,0.15)'}],
+    [{ x:0.5,y:0.3, radius:1.0, colorInner:'rgba(255,200,180,0.4)', colorMid:'rgba(200,140,255,0.08)'}]
+  ];
+
+  // create nebula planes and add to scene
+  let nebulaPlanes = [];
+  function createNebulaPlanes(layers=defaultNebulaLayers){
+    // remove old
+    nebulaPlanes.forEach(p=>{
+      if(p.material.map) p.material.map.dispose();
+      p.geometry.dispose();
+      p.material.dispose();
+      scene.remove(p);
+    });
+    nebulaPlanes = [];
+    const depths = [-16, -14, -12];
+    layers.forEach((layerSet, idx) => {
+      // build canvas combining gradients
+      const canvasTex = makeNebulaCanvas(2048,1024, layerSet);
+      const tex = new THREE.CanvasTexture(canvasTex);
+      tex.needsUpdate = true;
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite:false });
+      const geo = new THREE.PlaneGeometry(48, 24);
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(0, 0.5 - idx*0.15, depths[idx] || -10 - idx*2);
+      mesh.rotation.y = 0.03 * (idx%2 ? 1 : -1);
+      mesh.scale.set(1.3,1.3,1);
+      scene.add(mesh);
+      nebulaPlanes.push(mesh);
+    });
+  }
+
+  createNebulaPlanes();
+
+  // ---------- Star field (Points) ----------
+  let stars;
+  function createStars(count=2500, radius=80){
+    if (stars) {
+      stars.geometry.dispose();
+      stars.material.dispose();
+      scene.remove(stars);
+      stars = null;
+    }
+    const positions = new Float32Array(count*3);
+    for (let i=0;i<count;i++){
+      const phi = Math.acos(2*Math.random()-1);
+      const theta = 2*Math.PI*Math.random();
+      const r = THREE.MathUtils.lerp(40, radius, Math.random());
+      const x = r * Math.sin(phi) * Math.cos(theta);
+      const y = r * Math.sin(phi) * Math.sin(theta);
+      const z = r * Math.cos(phi);
+      positions[i*3] = x;
+      positions[i*3+1] = y;
+      positions[i*3+2] = z;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.06, transparent:true, opacity:0.9, sizeAttenuation:true });
+    stars = new THREE.Points(geo, mat);
+    scene.add(stars);
+  }
+  createStars(2500, 90);
+
+  // ---------- Soft glowing sphere (dynamic light) ----------
+  const glowGeo = new THREE.SphereGeometry(1.2, 32, 32);
+  const glowMat = new THREE.MeshStandardMaterial({ color: 0xcab8ff, emissive: 0x4b2bff, emissiveIntensity: 0.9, metalness: 0.1, roughness: 0.6 });
+  const glowSphere = new THREE.Mesh(glowGeo, glowMat);
+  glowSphere.position.set(-2.8, 1.6, -6);
+  scene.add(glowSphere);
+
+  // ---------- Camera & mouse parallax ----------
+  const mouse = { x:0, y:0 };
+  window.addEventListener('mousemove', (e)=>{
+    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = (e.clientY / window.innerHeight) * 2 - 1;
+  });
+
+  // ---------- Animation loop (optimized) ----------
+  let last = performance.now();
+  function animate(now){
+    const dt = (now - last) * 0.001;
+    last = now;
+    // subtle rotations
+    stars.rotation.y += 0.0006;
+    glowSphere.rotation.y += 0.0009;
+    nebulaPlanes.forEach((p, i)=> {
+      p.rotation.z += 0.0004 * (i+1);
+    });
+    // camera parallax
+    camera.position.x += (mouse.x * 0.8 - camera.position.x) * 0.06;
+    camera.position.y += (-mouse.y * 0.5 - camera.position.y) * 0.06;
+    camera.lookAt(0,0,0);
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+
+  // ---------- UI & controls wiring ----------
+  const btnGalaxy = document.getElementById('preset-galaxy');
+  const btnMinimal = document.getElementById('preset-minimal');
+  const qSlider = document.getElementById('bg-quality');
+  const upload = document.getElementById('bg-upload');
+
+  function setActive(btn){
+    [btnGalaxy, btnMinimal].forEach(b=>b.classList.remove('active'));
+    btn && btn.classList.add('active');
+  }
+
+  btnGalaxy.addEventListener('click', ()=>{
+    setActive(btnGalaxy);
+    // default rich galaxy
+    createNebulaPlanes(defaultNebulaLayers);
+    createStars(Math.round(2500 * parseFloat(qSlider.value)), 90);
+    glowSphere.visible = true;
+  });
+
+  btnMinimal.addEventListener('click', ()=>{
+    setActive(btnMinimal);
+    // minimal: fewer stars, dim nebula
+    createNebulaPlanes([[{x:0.5,y:0.45,radius:0.9,colorInner:'rgba(160,150,255,0.35)',colorMid:'rgba(100,90,200,0.06)'}]]);
+    createStars(Math.round(700 * parseFloat(qSlider.value)), 60);
+    glowSphere.visible = false;
+  });
+
+  qSlider.addEventListener('input', (e)=>{
+    const q = parseFloat(e.target.value);
+    const starCount = btnMinimal.classList.contains('active') ? Math.round(700*q) : Math.round(2500*q);
+    createStars(starCount, 90);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2) * q);
+  });
+
+  upload.addEventListener('change', (ev)=>{
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    const url = URL.createObjectURL(f);
+    // create texture and replace nebula planes with one plane using the image
+    removeNebulaPlanesAndUseImage(url);
+  });
+
+  function removeNebulaPlanesAndUseImage(url){
+    // remove existing planes
+    nebulaPlanes.forEach(p=>{
+      if(p.material.map) p.material.map.dispose();
+      if(p.geometry) p.geometry.dispose();
+      if(p.material) p.material.dispose();
+      scene.remove(p);
+    });
+    nebulaPlanes = [];
+    // create textured plane
+    const loader = new THREE.TextureLoader();
+    loader.load(url, tex=>{
+      const geo = new THREE.PlaneGeometry(60, 34);
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.95, depthWrite:false });
+      const plane = new THREE.Mesh(geo, mat);
+      plane.position.set(0,0,-18);
+      plane.rotation.y = 0.03;
+      scene.add(plane);
+      nebulaPlanes.push(plane);
+    }, undefined, err=>{ console.warn('bg image load error', err); });
+  }
+
+  // helper to clean nebula previous resources (used by upload)
+  function disposeNebula(){
+    nebulaPlanes.forEach(p=>{
+      if(p.material && p.material.map) p.material.map.dispose();
+      if(p.material) p.material.dispose();
+      if(p.geometry) p.geometry.dispose();
+      scene.remove(p);
+    });
+    nebulaPlanes = [];
+  }
+
+  // Responsive
+  window.addEventListener('resize', ()=>{
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+  });
+
+  // expose for debugging
+  window._galaxyBg = { scene, camera, renderer, createNebulaPlanes, createStars, disposeNebula };
+
+  // initial state
+  setActive(btnGalaxy);
+  // set quality initial based on slider
+  qSlider.dispatchEvent(new Event('input'));
+})();
+</script>
+<!-- ===== end Galaxy 3D Environment ===== -->
 
