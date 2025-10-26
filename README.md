@@ -175,7 +175,7 @@
       <div class="projects-grid">
         <article class="proj-card tilt-safe">
           <img src="IMG_20251016_170758.png" alt="AnimeInfo" onerror="this.src=invisible-threads.html">
-          <div class="proj-info"><h3>Invisible-threads</h3><p>AI-powered anime search & community curation — React, Node.js, AI</p></div>
+          <div class="proj-info"><a href="invisible-threads.html"><h3>Invisible-threads</h3></a><p>AI-powered anime search & community curation — React, Node.js, AI</p></div>
         </article>
         <article class="proj-card tilt-safe">
           <img src="IMG_20251008_073722.jpg" alt="Logic and Switching Theory" onerror="this.src='https://via.placeholder.com/800x450.png?text=Project+2';">
