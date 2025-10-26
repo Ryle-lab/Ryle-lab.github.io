@@ -178,7 +178,7 @@
           <div class="proj-info"><h3>AnimeInfo</h3><p>AI-powered anime search & community curation — React, Node.js, AI</p></div>
         </article>
         <article class="proj-card tilt-safe">
-          <img src="IMG_20251022_080816.jpg" alt="Logic and Switching Theory" onerror="this.src='https://via.placeholder.com/800x450.png?text=Project+2';">
+          <img src="IMG_20251008_073722.jpg" alt="Logic and Switching Theory" onerror="this.src='https://via.placeholder.com/800x450.png?text=Project+2';">
           <div class="proj-info"><h3>Logic & Switching Theory</h3><p>OR-gates activity and visual demos.</p></div>
         </article>
         <article class="proj-card tilt-safe">
@@ -207,7 +207,7 @@
         <div id="formStatus" style="margin-top:10px;color:var(--muted);font-size:.95rem"></div>
       </form>
     </section>
-  </main>
+
 
   <footer>© 2025 Ryle L. De Hitta. Crafted with ❤️ and creativity.</footer>
 
