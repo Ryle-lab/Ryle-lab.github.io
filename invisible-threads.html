@@ -1,0 +1,335 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Invisible Threads — Prototype</title>
+<style>
+  :root{
+    --bg:#0b1020; --dot:#97d0ff; --thread:#7af0b1; --accent:#ffd97a;
+  }
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#071022);font-family:Inter,system-ui;}
+  #app{height:100%;display:flex;flex-direction:column;}
+  header{padding:14px;color:#eee;display:flex;align-items:center;gap:12px;}
+  header h1{font-size:18px;margin:0;font-weight:600;}
+  #game{flex:1;position:relative;overflow:hidden;}
+  canvas{display:block;width:100%;height:100%;}
+  #hud{position:absolute;left:12px;top:12px;color:#dfefff;background:rgba(0,0,0,0.18);padding:8px 10px;border-radius:8px;font-size:13px;}
+  #controls{position:absolute;right:12px;top:12px;background:rgba(255,255,255,0.03);padding:8px;border-radius:8px;color:#cfe;}
+  button{background:transparent;border:1px solid rgba(255,255,255,0.06);color:#dfe;padding:6px 8px;border-radius:6px;cursor:pointer}
+  footer{padding:10px;color:#98b3c9;font-size:13px;text-align:center;}
+  .pulse{position:absolute;width:14px;height:14px;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;mix-blend-mode:screen}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Invisible Threads</h1>
+    <div style="opacity:0.75">Move mouse or touch. Click hold to send pulse. Discover the hidden path.</div>
+  </header>
+  <div id="game">
+    <canvas id="c"></canvas>
+    <div id="hud">Stage: <span id="stage">1</span> · Revealed: <span id="revealed">0</span>/<span id="target">0</span></div>
+    <div id="controls">
+      <button id="reset">Reset</button>
+      <button id="hint">Hint</button>
+    </div>
+  </div>
+  <footer>Novel puzzle: timing + spatial memory. This is a prototype.</footer>
+</div>
+
+<script>
+/* Invisible Threads prototype
+   - procedural nodes
+   - invisible path (sequence of nodes)
+   - pulses follow cursor; when pulse crosses a node in correct order with timing window, node reveals and tone plays
+*/
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d', {alpha:true});
+let W = canvas.width = innerWidth;
+let H = canvas.height = innerHeight - 120;
+const DPR = devicePixelRatio || 1;
+canvas.width = W*DPR; canvas.height = H*DPR; canvas.style.width = W+'px'; canvas.style.height = H+'px';
+ctx.scale(DPR,DPR);
+
+const hudStage = document.getElementById('stage');
+const hudRevealed = document.getElementById('revealed');
+const hudTarget = document.getElementById('target');
+const resetBtn = document.getElementById('reset');
+const hintBtn = document.getElementById('hint');
+
+window.addEventListener('resize', ()=>{ W = innerWidth; H = innerHeight - 120; canvas.width = W*DPR; canvas.height = H*DPR; canvas.style.width = W+'px'; canvas.style.height = H+'px'; ctx.setTransform(DPR,0,0,DPR,0,0); initStage(); draw(); });
+
+/* Audio setup - tiny synth using WebAudio */
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+function playTone(freq, dur=0.24, pan=0){
+  const o = AC.createOscillator();
+  const g = AC.createGain();
+  const p = AC.createStereoPanner();
+  o.type='sine'; o.frequency.value=freq;
+  g.gain.value=0.0001;
+  o.connect(g); g.connect(p); p.connect(AC.destination);
+  p.pan.value = pan;
+  const now = AC.currentTime;
+  g.gain.exponentialRampToValueAtTime(0.12, now+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, now+dur);
+  o.start(now); o.stop(now+dur+0.05);
+}
+
+/* Stage generation */
+let nodes = [];
+let path = [];
+let revealed = new Set();
+let stage = 1;
+let pulse = {x:-100,y:-100, vx:0, vy:0, active:false, lastHitTime:0};
+let lastMove = {x:0,y:0, t:0};
+const NODE_COUNT_BASE = 10;
+
+function rand(min,max){ return Math.random()*(max-min)+min; }
+
+function initStage(){
+  nodes = [];
+  revealed = new Set();
+  const count = NODE_COUNT_BASE + stage*2;
+  for(let i=0;i<count;i++){
+    nodes.push({
+      x: rand(60, W-60),
+      y: rand(60, H-60),
+      r: rand(6,11),
+      id: i
+    });
+  }
+  const pathLen = Math.max(4, Math.floor(count*0.45));
+  let remaining = nodes.map(n=>n.id);
+  let cur = remaining.splice(Math.floor(Math.random()*remaining.length),1)[0];
+  path = [cur];
+  while(path.length < pathLen){
+    let candidates = remaining.slice();
+    candidates.sort((a,b)=>{
+      const da = dist(nodesById(a), nodesById(cur));
+      const db = dist(nodesById(b), nodesById(cur));
+      return da - db + (Math.random()*(stage*0.3));
+    });
+    const pick = candidates[Math.floor(Math.random()*Math.min(4,candidates.length))];
+    remaining.splice(remaining.indexOf(pick),1);
+    path.push(pick);
+    cur = pick;
+  }
+  hudStage.textContent = stage;
+  hudTarget.textContent = path.length;
+  hudRevealed.textContent = 0;
+}
+function nodesById(id){ return nodes.find(n=>n.id===id); }
+function dist(a,b){ return Math.hypot(a.x-b.x,a.y-b.y); }
+
+/* Interaction */
+let isDown = false;
+canvas.addEventListener('pointerdown', (e)=>{
+  isDown = true;
+  pulse.active = true;
+  const r = canvas.getBoundingClientRect();
+  pulse.x = (e.clientX - r.left);
+  pulse.y = (e.clientY - r.top);
+  pulse.vx = 0; pulse.vy = 0;
+  pulse.time = performance.now();
+  lastMove = {x:pulse.x, y:pulse.y, t:pulse.time};
+  if (AC.state === 'suspended') AC.resume();
+});
+canvas.addEventListener('pointerup', ()=>{ isDown = false; pulse.active = false; });
+canvas.addEventListener('pointercancel', ()=>{ isDown = false; pulse.active = false; });
+canvas.addEventListener('pointermove', (e)=>{
+  const r = canvas.getBoundingClientRect();
+  const x = (e.clientX - r.left);
+  const y = (e.clientY - r.top);
+  const t = performance.now();
+  const dt = Math.max(16, t - lastMove.t);
+  pulse.vx = (x - lastMove.x) / dt * 16;
+  pulse.vy = (y - lastMove.y) / dt * 16;
+  pulse.x = x; pulse.y = y;
+  lastMove = {x,y,t};
+});
+
+/* Hint button reveals a soft glow along next node */
+hintBtn.addEventListener('click', ()=>{
+  const idx = nextPathIndex();
+  if(idx==null) return;
+  const n = nodesById(path[idx]);
+  flashHint(n.x,n.y);
+  playTone(220 + idx*10, 0.6, -0.3 + idx*0.05);
+});
+resetBtn.addEventListener('click', ()=>{ stage = 1; initStage(); });
+
+function nextPathIndex(){
+  for(let i=0;i<path.length;i++){
+    if(!revealed.has(path[i])) return i;
+  }
+  return null;
+}
+function flashHint(x,y){
+  const g = ctx.createRadialGradient(x,y,0,x,y,80);
+  g.addColorStop(0,'rgba(255,217,122,0.18)');
+  g.addColorStop(1,'rgba(255,217,122,0)');
+  ctx.save();
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x,y,80,0,Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+  hintTimer = 120;
+}
+let hintTimer = 0;
+
+/* Reveal logic */
+function tryHitNodes(){
+  if(!pulse.active) return;
+  const idx = nextPathIndex();
+  if(idx==null) return;
+  const targetNode = nodesById(path[idx]);
+  const d = dist({x:pulse.x,y:pulse.y}, targetNode);
+  const speed = Math.hypot(pulse.vx, pulse.vy) + 0.001;
+  const timingWindow = Math.min(220 + stage*40, 500);
+  const now = performance.now();
+  const proximityThresh = 28 + Math.max(0, 80 - speed*10);
+  if(d < proximityThresh){
+    if(now - pulse.lastHitTime > 120){
+      revealed.add(targetNode.id);
+      pulse.lastHitTime = now;
+      hudRevealed.textContent = revealed.size;
+      const baseFreq = 220;
+      const freq = baseFreq * Math.pow(1.06, idx);
+      const pan = (targetNode.x / W) * 2 - 1;
+      playTone(freq, 0.18 + idx*0.02, pan);
+      bursts.push({x:targetNode.x,y:targetNode.y,t:0,seed:Math.random()});
+      if(revealed.size >= path.length){
+        stage++;
+        setTimeout(()=>{ initStage(); }, 820);
+      }
+    }
+  }
+}
+
+/* Visual effects */
+let bursts = [];
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  const bg = ctx.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0,'rgba(8,12,24,0.7)');
+  bg.addColorStop(1,'rgba(6,9,18,0.9)');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0,0,W,H);
+
+  ctx.lineWidth = 1.6;
+  nodes.forEach(n=>{
+    if(revealed.has(n.id)){
+      ctx.strokeStyle = 'rgba(122,240,177,0.9)';
+      ctx.beginPath();
+      ctx.arc(n.x,n.y,n.r+6,0,Math.PI*2);
+      ctx.stroke();
+    } else {
+      ctx.strokeStyle = 'rgba(150,208,255,0.06)';
+      ctx.beginPath();
+      ctx.arc(n.x,n.y,n.r+3,0,Math.PI*2);
+      ctx.stroke();
+    }
+  });
+
+  nodes.forEach(n=>{
+    ctx.beginPath();
+    ctx.fillStyle = revealed.has(n.id) ? 'rgba(122,240,177,0.95)' : 'rgba(151,208,255,0.65)';
+    ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
+    ctx.fill();
+  });
+
+  ctx.lineWidth = 2.4;
+  ctx.strokeStyle = 'rgba(122,240,177,0.22)';
+  ctx.beginPath();
+  let started=false;
+  path.forEach(pid=>{
+    const p = nodesById(pid);
+    if(revealed.has(pid)){
+      if(!started){ ctx.moveTo(p.x,p.y); started=true; }
+      else ctx.lineTo(p.x,p.y);
+    }
+  });
+  ctx.stroke();
+
+  const nidx = nextPathIndex();
+  if(nidx!=null){
+    const nt = nodesById(path[nidx]);
+    const prog = Math.min(1, (revealed.size / Math.max(1,path.length)));
+    ctx.beginPath();
+    const g = ctx.createRadialGradient(nt.x,nt.y,0,nt.x,nt.y,80);
+    g.addColorStop(0, `rgba(255,217,122,${0.08 + prog*0.18})`);
+    g.addColorStop(1, 'rgba(255,217,122,0)');
+    ctx.fillStyle = g;
+    ctx.arc(nt.x,nt.y,80,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  bursts = bursts.filter(b=>b.t < 40);
+  bursts.forEach(b=>{
+    const life = b.t/40;
+    for(let i=0;i<8;i++){
+      const ang = i * Math.PI/4 + b.seed*6;
+      const rad = 6 + life*36;
+      ctx.fillStyle = `rgba(255,245,220,${0.9*(1-life)})`;
+      ctx.beginPath();
+      ctx.arc(b.x + Math.cos(ang)*rad, b.y + Math.sin(ang)*rad, 2.2*(1-life)+0.6,0,Math.PI*2);
+      ctx.fill();
+    }
+    b.t++;
+  });
+
+  if(pulse.active){
+    ctx.beginPath();
+    const g = ctx.createRadialGradient(pulse.x,pulse.y,0,pulse.x,pulse.y,36);
+    g.addColorStop(0,'rgba(122,240,177,0.14)');
+    g.addColorStop(1,'rgba(122,240,177,0)');
+    ctx.fillStyle = g;
+    ctx.arc(pulse.x,pulse.y,36,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.fillStyle = 'rgba(151,208,255,0.95)';
+    ctx.arc(pulse.x,pulse.y,6,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  if(hintTimer>0){
+    hintTimer--;
+  }
+
+  tryHitNodes();
+
+  requestAnimationFrame(draw);
+}
+
+setInterval(()=>{ bursts.forEach(b=>b.t++); }, 50);
+
+initStage();
+draw();
+
+let idleT = 0;
+setInterval(()=>{
+  if(revealed.size === 0) idleT++;
+  else idleT = 0;
+  if(idleT === 60){
+    playTone(180, 0.28, -0.4);
+    playTone(260, 0.24, 0.4);
+    idleT = 0;
+  }
+}, 1000);
+
+canvas.addEventListener('dblclick', ()=>{
+  if(revealed.size < path.length){
+    path.forEach(p=>revealed.add(p));
+    hudRevealed.textContent = revealed.size;
+  } else {
+    revealed.clear();
+    hudRevealed.textContent = 0;
+  }
+});
+</script>
+</body>
+</html>
