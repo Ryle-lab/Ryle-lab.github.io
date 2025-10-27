@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ryle L. De Hitta | Portfolio</title>
   <meta name="theme-color" content="#0b0f22" />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link href="Ryle_L_De_Hitta_Portfolio.html" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r150/three.min.js"></script>
 
   <style>
