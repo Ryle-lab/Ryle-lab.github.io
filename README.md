@@ -80,7 +80,7 @@
 
 <!-- Hero -->
 <main>
-  <h1>Welcome to My Portfolio</h1>
+  <a href="Ryle_L_De_Hitta_Portfolio.html"><h1>Welcome to My Portfolio</h1></a>
   <p>Explore my projects, skills, and creative works.</p>
 </main>
 
