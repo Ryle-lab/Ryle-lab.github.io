@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ryle L. De Hitta | Portfolio</title>
   <meta name="theme-color" content="#0b0f22" />
-  <link href="Ryle_L_De_Hitta_Portfolio.html" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r150/three.min.js"></script>
 
   <style>
@@ -80,7 +80,7 @@
 
 <!-- Hero -->
 <main>
-  <a href="Ryle_L_De_Hitta_Portfolio.html"><h1>Welcome to My Portfolio</h1></a>
+  <h1>Welcome,<a href="Ryle_L_De_Hitta_Portfolio.html"> Enter?</a></h1>
   <p>Explore my projects, skills, and creative works.</p>
 </main>
 
