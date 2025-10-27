@@ -1,0 +1,255 @@
+<!--
+Project: Invisible Threads — Quantum Pulse (PWA-ready)
+Files included in this single text document. Save each section as separate files in the same folder to produce the PWA:
+
+1) index.html        -> main game HTML (open in browser)
+2) manifest.json     -> web app manifest
+3) sw.js             -> service worker for offline caching
+4) README.txt        -> packaging & install notes
+
+INSTRUCTIONS: Create a folder, place these four files inside, serve via HTTPS or use localhost. Then open index.html and click "Install" from browser menu (or Add to Home Screen). The service worker will cache the app shell and make it available offline. The ambient background music is synthesized with WebAudio (no external audio files needed).
+-->
+
+==== index.html ====
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Invisible Threads — Quantum Pulse (PWA)</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#071225">
+<style>
+  :root{--bg-0:#050816;--bg-1:#071225;--accent:#7af0b1;--soft:#97d0ff;--muted:#9fb3c8}
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg-0),var(--bg-1));font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e6f6ff}
+  *{box-sizing:border-box}
+  #app{min-height:100vh;display:flex;flex-direction:column}
+  header{padding:12px 14px;display:flex;align-items:center;justify-content:space-between}
+  header h1{font-size:16px;margin:0}
+  .container{flex:1;display:flex;gap:12px;padding:10px}
+  .gameWrap{flex:1;min-width:320px;max-width:960px;padding:8px;border-radius:10px}
+  canvas{width:100%;height:calc(100vh - 220px);display:block;border-radius:8px;touch-action:none}
+  .side{width:320px;max-width:36%;display:flex;flex-direction:column}
+  .card{background:rgba(255,255,255,0.02);padding:10px;border-radius:10px;margin-bottom:12px}
+  .btn{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;border-radius:8px;color:var(--soft);cursor:pointer}
+  .btn.primary{background:linear-gradient(90deg,#00d1ff33,#00ffa733);border:none;color:#042}
+  .small{font-size:12px;color:var(--muted)}
+  #installHint{font-size:12px;color:var(--muted);margin-left:12px}
+  @media (max-width:860px){.container{flex-direction:column}.side{width:100%}.gameWrap{order:0}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div>
+      <h1>Invisible Threads — Quantum Pulse</h1>
+      <div class="small">PWA · Mobile-first · Offline-ready</div>
+    </div>
+    <div id="installHint">Install: menu » Add to Home screen</div>
+  </header>
+
+  <div class="container">
+    <div class="gameWrap card">
+      <canvas id="gameCanvas" aria-label="Invisible Threads game canvas"></canvas>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="muteBtn" class="btn">Mute Music</button>
+        <button id="debugBtn" class="btn">Debug</button>
+        <button id="installBtn" class="btn primary" style="margin-left:auto">Install</button>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="card">
+        <div class="small">Stage</div>
+        <div id="stageLabel" style="font-weight:700">1 — Prologue</div>
+        <div style="height:8px"></div>
+        <div class="small">Score</div>
+        <div id="scoreLabel" style="font-weight:700">0</div>
+      </div>
+
+      <div class="card">
+        <div class="small">Console</div>
+        <div id="console" style="height:220px;overflow:auto;background:#001215;padding:8px;border-radius:8px;margin-top:8px;font-family:ui-monospace,monospace;font-size:12px;color:#bfe">Ready.</div>
+      </div>
+    </div>
+  </div>
+
+  <footer style="padding:12px;text-align:center;color:var(--muted)">Offline-ready. Synth ambient music. Vibration on hit (if supported).</footer>
+</div>
+
+<script>
+/*
+Index (single-file game core)
+- Synth ambient soundtrack using WebAudio (no external files)
+- PWA install prompt handling
+- Offline-safe: if service worker unavailable, game still runs
+- Debug overlay / self-test
+- Defensive fixes to avoid undefined node lookups
+*/
+
+// Simple logger to on-screen console (collapsible)
+const consoleEl = document.getElementById('console');
+function log(msg){ const d = document.createElement('div'); d.textContent = `[${(new Date()).toLocaleTimeString()}] ${msg}`; consoleEl.prepend(d); if(consoleEl.children.length>200) consoleEl.removeChild(consoleEl.lastChild); }
+
+// Canvas & resize
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', {alpha:true});
+let W = 780, H = 540; const DPR = window.devicePixelRatio || 1;
+function resize(){ const rect = canvas.getBoundingClientRect(); W = Math.max(320, Math.floor(rect.width)); H = Math.max(360, Math.floor(rect.height)); canvas.width = Math.floor(W*DPR); canvas.height = Math.floor(H*DPR); canvas.style.width = rect.width + 'px'; canvas.style.height = rect.height + 'px'; ctx.setTransform(DPR,0,0,DPR,0,0); }
+window.addEventListener('resize', resize); setTimeout(resize,50);
+
+// PWA install events
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e)=>{ e.preventDefault(); deferredPrompt = e; document.getElementById('installBtn').style.display = 'inline-block'; log('Install prompt ready'); });
+document.getElementById('installBtn').addEventListener('click', async ()=>{ if(!deferredPrompt) return; deferredPrompt.prompt(); const choice = await deferredPrompt.userChoice; log('Install choice: '+choice.outcome); deferredPrompt = null; document.getElementById('installBtn').style.display='none'; });
+
+// service worker registration (best effort)
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').then(()=>{ log('Service worker registered'); }).catch(err=>{ log('Service worker failed: '+err); });
+} else log('Service worker not supported');
+
+// webaudio ambient synthesizer (looping pad + gentle pulses)
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+let musicOn = true;
+function startAmbient(){ try{
+  // pad (two detuned oscillators + lowpass)
+  const pad = AC.createGain(); pad.gain.value = 0.0;
+  const o1 = AC.createOscillator(); o1.type='sine'; o1.frequency.value = 110; // A2
+  const o2 = AC.createOscillator(); o2.type='sine'; o2.frequency.value = 110 * 1.012;
+  const lp = AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 800;
+  o1.connect(lp); o2.connect(lp); lp.connect(pad); pad.connect(AC.destination);
+  o1.start(); o2.start();
+  // slow volume ramp
+  pad.gain.linearRampToValueAtTime(0.06, AC.currentTime + 2);
+  // gentle LFO on filter
+  const lfo = AC.createOscillator(); lfo.frequency.value = 0.07; const lfoGain = AC.createGain(); lfoGain.gain.value = 420; lfo.connect(lfoGain); lfoGain.connect(lp.frequency); lfo.start();
+  // periodic bright chime
+  function chime(){ const g = AC.createGain(); g.gain.value = 0.0001; const o = AC.createOscillator(); o.type='triangle'; o.frequency.value = 420 + Math.random()*80; o.connect(g); g.connect(AC.destination); const now = AC.currentTime; g.gain.exponentialRampToValueAtTime(0.14, now+0.01); g.gain.exponentialRampToValueAtTime(0.0001, now+1.2); o.start(now); o.stop(now+1.25); }
+  // schedule chimes every ~8-14s random
+  let chimeTimer = setInterval(()=>{ if(musicOn) chime(); }, 9000 + Math.random()*6000);
+  // store for stop
+  startAmbient._pad = pad; startAmbient._o1=o1; startAmbient._o2=o2; startAmbient._lp=lp; startAmbient._lfo=lfo; startAmbient._chimeTimer=chimeTimer;
+ }catch(e){ log('Ambient synth failed: '+e); }
+}
+function stopAmbient(){ try{ musicOn=false; const pad = startAmbient._pad; if(pad) pad.gain.linearRampToValueAtTime(0.0001, AC.currentTime+1.4); clearInterval(startAmbient._chimeTimer); }catch(e){} }
+
+// user controls
+const muteBtn = document.getElementById('muteBtn'); muteBtn.addEventListener('click', ()=>{ musicOn = !musicOn; if(musicOn){ muteBtn.textContent='Mute Music'; startAmbient(); } else { muteBtn.textContent='Unmute'; stopAmbient(); } });
+
+// vibration helper
+function vib(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){} }
+
+// game data and helpers
+const STAGES = [{id:1,name:'Prologue',nodeBase:10,complexity:0.9},{id:2,name:'Synapse',nodeBase:12,complexity:1.0},{id:3,name:'Echo Chamber',nodeBase:14,complexity:1.2}];
+let stageIndex=0,nodes=[],path=[],revealed=new Set(),bursts=[],player={x:80,y:140,vx:0,vy:0},pulse={active:false,x:-100,y:-100,vx:0,vy:0,lastHit:0},score=0,combo=1,comboTimer=0,hints=3,stageProgress=0,totalTargets=0,debug=false;
+function rand(a,b){return Math.random()*(b-a)+a}
+function nodeById(id){ if(!nodes) return null; return nodes.find(n=>n && n.id===id) || null; }
+
+function initStage(i=0){ stageIndex=i; nodes=[]; revealed=new Set(); bursts=[]; const s=STAGES[Math.min(i,STAGES.length-1)]; const count=Math.max(6, Math.floor(s.nodeBase * s.complexity)); for(let j=0;j<count;j++){ nodes.push({id:j,x:rand(60,Math.max(120,W-60)),y:rand(60,Math.max(120,H-60)),r:rand(6,12)}); } // path
+  let remaining=nodes.map(n=>n.id); if(remaining.length===0){ path=[]; totalTargets=0; stageProgress=0; return; } let cur=remaining.splice(Math.floor(Math.random()*remaining.length),1)[0]; path=[cur]; while(path.length < Math.max(3,Math.floor(count*0.5)) && remaining.length>0){ remaining.sort((a,b)=>{ const na=nodeById(a), nb=nodeById(b), nc=nodeById(cur); const da = na && nc ? Math.hypot(na.x-nc.x, na.y-nc.y) : 1e6; const db = nb && nc ? Math.hypot(nb.x-nc.x, nb.y-nc.y) : 1e6; return da - db + (Math.random()*2); }); const pick = remaining.splice(0, Math.min(3,remaining.length))[Math.floor(Math.random()*Math.min(3,remaining.length))]; path.push(pick); cur=pick; }
+  totalTargets = path.length; stageProgress = 0; document.getElementById('stageLabel').textContent = `${s.id} — ${s.name}`; document.getElementById('scoreLabel').textContent = score; updateProgress(); }
+
+function updateProgress(){ const pct = Math.round((stageProgress/Math.max(1,totalTargets))*100); document.getElementById('progressBar')?.style && (document.getElementById('progressBar').style.width = pct + '%'); }
+
+// pointer handling
+let lastMove={x:0,y:0,t:0}; canvas.addEventListener('pointerdown', e=>{ pulse.active=true; const r=canvas.getBoundingClientRect(); pulse.x = e.clientX - r.left; pulse.y = e.clientY - r.top; lastMove={x:pulse.x,y:pulse.y,t:performance.now()}; try{ AC.resume(); }catch(e){} });
+window.addEventListener('pointerup', ()=>{ pulse.active=false; });
+canvas.addEventListener('pointermove', e=>{ const r=canvas.getBoundingClientRect(); const x=e.clientX-r.left,y=e.clientY-r.top,t=performance.now(); const dt=Math.max(16, t - (lastMove.t||t)); pulse.vx = (x - (lastMove.x||x))/dt*16; pulse.vy = (y - (lastMove.y||y))/dt*16; pulse.x=x; pulse.y=y; lastMove={x,y,t}; });
+
+// try hit
+function nextTargetIndex(){ if(!path || path.length===0) return null; for(let i=0;i<path.length;i++){ if(!revealed.has(path[i])) return i; } return null; }
+function tryHit(){ if(!pulse.active) return; const idx = nextTargetIndex(); if(idx==null) return; const tnode = nodeById(path[idx]); if(!tnode) return; const d = Math.hypot(pulse.x-tnode.x,pulse.y-tnode.y); const speed = Math.hypot(pulse.vx,pulse.vy)+0.001; const proximity = 28 + Math.max(0, 80 - speed*12); const now = performance.now(); if(d < proximity && now - pulse.lastHit > 120){ vib(20); score += Math.round(120 * combo * Math.min(3,0.6 + speed*0.06)); revealed.add(tnode.id); stageProgress++; bursts.push({x:tnode.x,y:tnode.y,t:0,type:'pop'}); pulse.lastHit = now; combo += 0.45; comboTimer = 2.4; document.getElementById('scoreLabel').textContent = score; updateProgress(); if(stageProgress >= totalTargets){ log('Stage cleared'); setTimeout(()=>initStage(stageIndex+1),700); } } }
+
+// render loop
+let lastTime=Date.now(); function loop(){ const now=Date.now(); const dt=Math.min(40, now-lastTime)/1000; lastTime=now; if(pulse.active){ player.vx += (pulse.x - player.x) * Math.min(1, 6*dt); player.vy += (pulse.y - player.y) * Math.min(1, 6*dt); } player.x += player.vx * dt * 30; player.y += player.vy * dt * 30; player.vx *= 0.92; player.vy *= 0.92; player.x = Math.max(8, Math.min(W-8, player.x)); player.y = Math.max(8, Math.min(H-8, player.y)); // draw
+  ctx.clearRect(0,0,W,H); const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#04101a'); g.addColorStop(1,'#031023'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  // nodes
+  for(const n of nodes){ if(!n) continue; if(revealed.has(n.id)){ const ring = ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,40); ring.addColorStop(0,'rgba(122,240,177,0.12)'); ring.addColorStop(1,'rgba(122,240,177,0)'); ctx.fillStyle = ring; ctx.beginPath(); ctx.arc(n.x,n.y,40,0,Math.PI*2); ctx.fill(); ctx.fillStyle='rgba(122,240,177,0.95)'; ctx.beginPath(); ctx.arc(n.x,n.y,n.r,0,Math.PI*2); ctx.fill(); } else { ctx.strokeStyle='rgba(151,208,255,0.04)'; ctx.beginPath(); ctx.arc(n.x,n.y,n.r+3,0,Math.PI*2); ctx.stroke(); } }
+  // partial path
+  ctx.lineWidth=2.2; ctx.strokeStyle='rgba(122,240,177,0.22)'; ctx.beginPath(); let started=false; if(path && path.length>0){ for(const pid of path){ const pn=nodeById(pid); if(!pn) continue; if(revealed.has(pid)){ if(!started){ ctx.moveTo(pn.x,pn.y); started=true; } else ctx.lineTo(pn.x,pn.y); } } } ctx.stroke(); // bursts
+  for(const b of bursts){ const life=Math.min(1,b.t/48); if(b.type==='pop'){ for(let i=0;i<8;i++){ const ang=i/8*Math.PI*2; const rad=6+life*28; ctx.fillStyle=`rgba(255,245,220,${0.9*(1-life)})`; ctx.beginPath(); ctx.arc(b.x+Math.cos(ang)*rad, b.y+Math.sin(ang)*rad, 2.2*(1-life)+0.6,0,Math.PI*2); ctx.fill(); } } else if(b.type==='hint'){ const alpha=0.18*Math.max(0,1-b.t/48); const g2=ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,80); g2.addColorStop(0,`rgba(255,217,122,${alpha})`); g2.addColorStop(1,'rgba(255,217,122,0)'); ctx.fillStyle=g2; ctx.beginPath(); ctx.arc(b.x,b.y,80,0,Math.PI*2); ctx.fill(); } b.t+=dt*60; }
+  // pulse
+  if(pulse.active){ const gr=ctx.createRadialGradient(pulse.x,pulse.y,0,pulse.x,pulse.y,48); gr.addColorStop(0,'rgba(122,240,177,0.16)'); gr.addColorStop(1,'rgba(122,240,177,0)'); ctx.fillStyle=gr; ctx.beginPath(); ctx.arc(pulse.x,pulse.y,48,0,Math.PI*2); ctx.fill(); ctx.fillStyle='rgba(151,208,255,0.95)'; ctx.beginPath(); ctx.arc(pulse.x,pulse.y,6,0,Math.PI*2); ctx.fill(); }
+  // player
+  const grad=ctx.createRadialGradient(player.x,player.y,2,player.x,player.y,36); grad.addColorStop(0,'rgba(32,200,255,0.95)'); grad.addColorStop(1,'rgba(32,200,255,0.02)'); ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(player.x,player.y,12,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#cfefff'; ctx.beginPath(); ctx.arc(player.x,player.y,4,0,Math.PI*2); ctx.fill(); // HUD
+  ctx.fillStyle='rgba(0,0,0,0.25)'; ctx.fillRect(10,Math.max(80,H-48),220,36); ctx.fillStyle='#cfe7ff'; ctx.font='12px system-ui, sans-serif'; ctx.fillText(`Stage ${stageIndex+1} · Revealed ${stageProgress}/${totalTargets}`, 18, Math.max(96,H-24)); tryHit(); requestAnimationFrame(loop); }
+
+// debug & buttons
+const debugBtn = document.getElementById('debugBtn'); debugBtn.addEventListener('click', ()=>{ debug=!debug; log('Debug '+debug); }); document.getElementById('muteBtn').click(); // start muted by default
+
+// initial start with self-test
+function selfTest(){ log('Running self-test: generating stage and simulating pulses'); try{ initStage(0); // simulate 3 quick pulses near first path node (defensive)
+  const idx = nextTargetIndex(); const n = nodeById(path[idx]); if(n){ for(let i=0;i<3;i++){ pulse.x = n.x + Math.random()*6 -3; pulse.y = n.y + Math.random()*6 -3; pulse.vx = 0; pulse.vy=0; pulse.active=true; tryHit(); pulse.active=false; } log('Self-test completed'); } else log('Self-test: no target node found'); }catch(e){ log('Self-test error: '+e); }
+}
+
+// expose api and run
+window.addEventListener('load', ()=>{ resize(); initStage(0); loop(); // start ambient after user gesture recommended — but start synthesizer quietly when possible
+  try{ startAmbient(); }catch(e){ log('Ambient start error: '+e); }
+  // self test after short delay so layout stabilizes
+  setTimeout(selfTest, 900);
+});
+
+// graceful unload: stop audio
+window.addEventListener('pagehide', ()=>{ try{ stopAmbient(); }catch(e){} });
+
+// vibration wrapper
+function vib(ms){ try{ navigator.vibrate && navigator.vibrate(ms); }catch(e){} }
+</script>
+</body>
+</html>
+
+==== manifest.json ====
+{
+  "name": "Invisible Threads — Quantum Pulse",
+  "short_name": "InvisibleThreads",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#071225",
+  "theme_color": "#071225",
+  "description": "A cinematic hidden-path puzzle with pulse mechanics — offline and mobile-ready.",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
+
+==== sw.js ====
+// Simple service worker: cache app shell and serve offline. Cache-first for known resources.
+const CACHE_NAME = 'invisible-threads-v1';
+const ASSETS = [
+  '/', '/index.html', '/manifest.json', '/sw.js'
+  // add icons if you place them in /icons/
+];
+self.addEventListener('install', (e)=>{
+  self.skipWaiting();
+  e.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(ASSETS)).catch(err=>console.warn('SW install cache failed',err)));
+});
+self.addEventListener('activate', (e)=>{ e.waitUntil(self.clients.claim()); });
+self.addEventListener('fetch', (e)=>{
+  const req = e.request;
+  // only handle GET navigation or same-origin requests
+  if(req.method !== 'GET') return;
+  e.respondWith(caches.match(req).then(cached=>{
+    if(cached) return cached;
+    return fetch(req).then(resp=>{
+      // cache successful GETs (basic caching)
+      if(resp && resp.status === 200 && resp.type === 'basic'){
+        const copy = resp.clone(); caches.open(CACHE_NAME).then(cache=>cache.put(req, copy));
+      }
+      return resp;
+    }).catch(()=>{
+      // fallback: if navigation request, return a minimal offline page (built-in response)
+      if(req.mode === 'navigate' || (req.headers && req.headers.get('accept') && req.headers.get('accept').includes('text/html'))){
+        return new Response(`<!doctype html><meta charset="utf-8"><title>Offline</title><body style="background:#071225;color:#fff;font-family:system-ui;padding:24px"><h2>Offline</h2><p>The game is offline — reopen after connecting or check your cache.</p></body>`, {headers:{'Content-Type':'text/html'}});
+      }
+    });
+  }));
+});
+
+==== README.txt ====
+1) Put these files into a folder: index.html, manifest.json, sw.js, and an "icons" folder with icon-192.png and icon-512.png if you want install icons.
+2) Serve over HTTPS (or use localhost) for service worker and install support. Example: `npx http-server ./ -p 8080` then open https://localhost:8080/index.html
+3) On first load the service worker will cache app shell. After that the game will be available offline.
+4) The ambient music is synthesized — no external audio required. Mobile browsers may require a user gesture to start audio.
+
+-- End of package --
