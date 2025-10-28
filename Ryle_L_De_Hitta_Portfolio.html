@@ -4,12 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Ryle L. De Hitta | Portfolio</title>
-  <meta name="theme-color" content="#0b0f22" />
+  <meta name="theme-color" content="#000000" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
 
   <style>
-    :root{
+    :root {
       --bg:#05070f; --card:#0f1724; --muted:#94a3b8;
       --accent1:#7c3aed; --accent2:#4f46e5; --radius:12px;
     }
@@ -17,21 +18,21 @@
     html,body{height:100%;margin:0}
     body{
       font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,Arial;
-      background:var(--bg); color:#e6eef8; -webkit-font-smoothing:antialiased;
+      background:var(--bg);color:#e6eef8;-webkit-font-smoothing:antialiased;
       overflow-x:hidden;
     }
 
-    /* 3D canvas (background) */
     canvas#bg3d{
       position:fixed;left:0;top:0;width:100%;height:100%;z-index:-1;pointer-events:none;
       display:block;
     }
 
-    /* Page layout */
-    .page { max-width:1100px; margin:0 auto; padding:20px; }
+    .page{max-width:1100px;margin:0 auto;padding:20px;}
     nav{
-      position:sticky; top:0; z-index:40; backdrop-filter:blur(8px);
-      background:rgba(7,10,20,0.55); padding:14px 20px; display:flex;justify-content:space-between;align-items:center;
+      position:sticky;top:0;z-index:40;backdrop-filter:blur(8px);
+      background:rgba(7,10,20,0.55);
+      padding:14px 20px;
+      display:flex;justify-content:space-between;align-items:center;
       border-bottom:1px solid rgba(255,255,255,0.02);
     }
     .logo{font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--accent1);font-size:18px}
@@ -39,126 +40,102 @@
     .nav-links a{color:var(--muted);font-weight:600;padding:8px 10px;border-radius:8px;text-decoration:none}
     .nav-links a:hover{color:#fff;background:rgba(255,255,255,0.03);transform:translateY(-2px)}
 
-    /* Hero */
-    .hero{display:flex;gap:32px;align-items:center;padding:84px 0 48px}
-    .hero-left{flex:1;min-width:220px}
+    .hero{
+      background:linear-gradient(180deg,#000000,#0f1724);
+      display:flex;gap:32px;align-items:center;justify-content:space-between;
+      padding:80px 0 60px;border-radius:0 0 18px 18px;
+    }
+    .hero-left{flex:1;min-width:220px;padding:0 20px;}
     .hero h1{font-family:'Space Grotesk',sans-serif;font-size:36px;margin:0 0 12px;color:#fff}
     .lead{color:var(--muted);font-size:15px;line-height:1.6;margin-bottom:18px}
     .cta{display:flex;gap:12px;flex-wrap:wrap}
     .btn{padding:10px 14px;border-radius:10px;font-weight:700;border:0;cursor:pointer}
     .btn-primary{background:linear-gradient(90deg,var(--accent1),var(--accent2));color:#fff}
     .btn-outline{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
-    .hero-right{width:180px;display:flex;justify-content:center}
-    .profile{width:180px;height:180px;border-radius:50%;overflow:hidden;border:3px solid rgba(255,255,255,0.06);box-shadow:0 10px 30px rgba(2,6,23,0.6)}
+    .hero-right{text-align:center}
+    .profile{width:180px;height:180px;border-radius:50%;overflow:hidden;
+      border:3px solid rgba(255,255,255,0.08);
+      box-shadow:0 10px 30px rgba(2,6,23,0.6);
+      margin:0 auto 10px;
+    }
     .profile img{width:100%;height:100%;object-fit:cover;display:block}
+    .edit-btn{
+      background:transparent;color:var(--accent1);border:1px solid var(--accent1);
+      border-radius:8px;padding:6px 12px;cursor:pointer;font-weight:600;
+      transition:.3s;display:inline-flex;align-items:center;gap:6px;
+    }
+    .edit-btn:hover{background:var(--accent1);color:#fff;transform:scale(1.05)}
 
-    /* Sections */
     section{padding:48px 0}
     h2{font-family:'Space Grotesk',sans-serif;font-size:20px;margin-bottom:12px;color:#fff;text-align:center}
-    .about-grid{display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start}
-    .card{background:linear-gradient(180deg,rgba(255,255,255,0.01),rgba(255,255,255,0.02));padding:18px;border-radius:12px;border:1px solid rgba(255,255,255,0.02)}
+    .card{background:var(--card);padding:18px;border-radius:12px;border:1px solid rgba(255,255,255,0.03)}
+
     .projects-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}
     .proj{background:var(--card);border-radius:12px;overflow:hidden;box-shadow:0 10px 30px rgba(2,6,23,0.6)}
-    .proj img{width:100%;height:150px;object-fit:cover;display:block}
+    .proj img{width:100%;height:150px;object-fit:cover}
     .proj .pinfo{padding:12px;color:var(--muted)}
 
-    /* Skills */
     .skills{max-width:640px;margin:0 auto;display:grid;gap:12px}
-    .skill{display:block}
     .skill label{display:flex;justify-content:space-between;color:var(--muted);font-weight:600;margin-bottom:6px}
     .bar{background:rgba(255,255,255,0.04);border-radius:999px;height:10px;overflow:hidden}
     .fill{height:100%;background:linear-gradient(90deg,var(--accent1),var(--accent2));width:0;transition:width 1.4s ease}
 
-    /* Contact */
-    form{max-width:640px;margin:0 auto;display:block}
-    input,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.02);color:inherit;margin-bottom:10px}
-
     footer{padding:32px 0;text-align:center;color:var(--muted)}
 
-    /* small screens */
-    @media (max-width:880px){
-      .about-grid{grid-template-columns:1fr}
-      .hero{flex-direction:column;align-items:center;text-align:center}
-      .hero-right{order:-1;margin-bottom:18px}
-      nav{padding:12px}
-      canvas#bg3d{display:none} /* disable heavy 3D on small */
+    /* bottom-right upload button */
+    #bgUpload{
+      position:fixed;bottom:20px;right:20px;
+      background:linear-gradient(135deg,var(--accent1),var(--accent2));
+      color:#fff;border:none;border-radius:50%;width:48px;height:48px;
+      font-size:20px;cursor:pointer;box-shadow:0 8px 20px rgba(99,102,241,0.4);
+      z-index:100;transition:transform .3s ease;
+    }
+    #bgUpload:hover{transform:scale(1.1)}
+
+    @media(max-width:880px){
+      .hero{flex-direction:column;text-align:center}
+      .hero-right{margin-bottom:20px}
+      canvas#bg3d{display:none}
     }
   </style>
 </head>
 <body>
-  <!-- 3D background canvas -->
-  <canvas id="bg3d" aria-hidden="true"></canvas>
+  <canvas id="bg3d"></canvas>
 
-  <!-- Navigation -->
-  <nav class="page" role="navigation" aria-label="Main">
+  <nav class="page">
     <div class="logo">Ryle L. De Hitta</div>
-    <div class="nav-links" id="navLinks">
-      <a class="nav-link" href="#home">Home</a>
-      <a class="nav-link" href="#about">About</a>
-      <a class="nav-link" href="#projects">Projects</a>
-      <a class="nav-link" href="#skills">Skills</a>
-      <a class="nav-link" href="#contact">Contact</a>
+    <div class="nav-links">
+      <a href="#home">Home</a><a href="#about">About</a><a href="#projects">Projects</a><a href="#skills">Skills</a><a href="#contact">Contact</a>
     </div>
   </nav>
 
-  <!-- Content -->
-  <main id="home" class="page">
-    <section class="hero" aria-labelledby="heroTitle">
+  <main class="page" id="home">
+    <section class="hero">
       <div class="hero-left">
-        <h1 id="heroTitle">Curious Mind. Code Crafter. Innovator.</h1>
-        <p class="lead">Hey, I’m <strong>Ryle L. De Hitta</strong>. I build AI-powered apps, electronics demos, and community tools inspired by Filipino culture. I learn by doing and love sharing knowledge through real-world examples.</p>
+        <h1>Curious Mind. Code Crafter. Innovator.</h1>
+        <p class="lead">Hi, I’m <strong>Ryle L. De Hitta</strong> — a BSIT-CPT-1 student passionate about building modern, AI-driven, and tech-inspired experiences.</p>
         <div class="cta">
           <a class="btn btn-primary" href="#projects">Explore Projects</a>
           <a class="btn btn-outline" href="#contact">Contact</a>
         </div>
       </div>
       <div class="hero-right">
-        <div class="profile" role="img" aria-label="Profile">
-          <img src="IMG_20250814_092221.jpg" alt="Ryle profile" onerror="this.src='https://via.placeholder.com/400x400.png?text=Profile'">
-        </div>
+        <div class="profile"><img src="IMG_20250814_092221.jpg" alt="Ryle profile" onerror="this.src='https://via.placeholder.com/400x400.png?text=Profile'"></div>
+        <button class="edit-btn"><i class="fa-solid fa-pen"></i> Edit</button>
       </div>
     </section>
 
-    <section id="about" aria-labelledby="aboutTitle">
-      <h2 id="aboutTitle">About Me</h2>
-      <div class="about-grid">
-        <div class="card">
-          <p style="color:var(--muted)">Hello! I’m <strong>Ryle L. De Hitta</strong>, a passionate tech explorer studying BSIT-CPT-1. I build apps, electronics demos, and community tools inspired by Filipino culture. I learn by doing and love sharing knowledge.</p>
-          <ul style="color:var(--muted);margin-top:12px;padding-left:18px;line-height:1.8">
-            <li>📚 Course: BSIT-CPT-1</li>
-            <li>💻 Habit: Coding & exploring new tech</li>
-            <li>📍 Location: Brgy. Mapulot, Tagkawayan, Quezon</li>
-          </ul>
-        </div>
-        <aside class="card" style="text-align:center">
-          <a href="invisible_threads_quantum_pulse_upgraded.html"><h3 style="margin:0 0 8px;color:var(--accent2)">Invisible threads</h3></a>
-          <p style="color:var(--muted);margin:0">A game created with AI with a of Ryle to build.</p>
-        </aside>
-      </div>
-    </section>
-
-    <section id="projects" aria-labelledby="projectsTitle">
-      <h2 id="projectsTitle">Projects</h2>
+    <section id="projects">
+      <h2>Projects</h2>
       <div class="projects-grid">
-        <article class="proj">
-          <img src="IMG_20251016_170758.png" alt="AnimeInfo" onerror="this.src='https://via.placeholder.com/800x450.png?text=AnimeInfo'">
-          <div class="pinfo"><strong>AnimeInfo</strong><div style="color:var(--muted);font-size:13px">AI-powered anime search and community curation — React, Node.js</div></div>
-        </article>
-
-        <article class="proj">
-          <img src="IMG_20251022_080816.jpg" alt="Logic" onerror="this.src='https://via.placeholder.com/800x450.png?text=Logic+Activity'">
-          <div class="pinfo"><strong>Logic & Switching Theory</strong><div style="color:var(--muted);font-size:13px">OR-gates activity and visual demos — Arduino, Python</div></div>
-        </article>
-
-        <article class="proj">
-          <img src="Screenshot_20251022_194013_22e4250240c136c826b8a3b1264b092d.jpg" alt="MLBB" onerror="this.src='https://via.placeholder.com/800x450.png?text=MLBB+Highlights'">
-          <div class="pinfo"><strong>MLBB Highlights</strong><div style="color:var(--muted);font-size:13px">Game highlights editing and showcase</div></div>
-        </article>
+        <div class="proj"><img src="https://via.placeholder.com/800x450.png?text=AnimeInfo"><div class="pinfo"><strong>AnimeInfo</strong><div style="font-size:13px;color:var(--muted)">AI-powered anime search and community curation — React, Node.js</div></div></div>
+        <div class="proj"><img src="https://via.placeholder.com/800x450.png?text=Barangay+Assistant"><div class="pinfo"><strong>Barangay Assistant</strong><div style="font-size:13px;color:var(--muted)">Community tools for local governance and support — Vue, Firebase</div></div></div>
+        <div class="proj"><img src="https://via.placeholder.com/800x450.png?text=Electronics+Experiments"><div class="pinfo"><strong>Electronics Experiments</strong><div style="font-size:13px;color:var(--muted)">Capacitor demos, Boolean logic simulations, and hands-on notes — Arduino, Python</div></div></div>
       </div>
     </section>
 
-    <section id="skills" aria-labelledby="skillsTitle">
-      <h2 id="skillsTitle">Skills</h2>
+    <section id="skills">
+      <h2>Skills</h2>
       <div class="skills">
         <div class="skill"><label>JavaScript <span>Advanced</span></label><div class="bar"><div class="fill" style="width:85%"></div></div></div>
         <div class="skill"><label>Python <span>Intermediate</span></label><div class="bar"><div class="fill" style="width:70%"></div></div></div>
@@ -166,182 +143,95 @@
       </div>
     </section>
 
-    <section id="contact" aria-labelledby="contactTitle">
-      <h2 id="contactTitle">Contact</h2>
-      <form id="contactForm" style="max-width:640px;margin:0 auto;">
-        <input name="name" placeholder="Your name" required>
-        <input name="email" type="email" placeholder="Your email" required>
-        <textarea name="message" rows="5" placeholder="Message" required></textarea>
-        <div style="display:flex;gap:12px">
-          <button class="btn btn-primary" type="submit">Send</button>
-          <button class="btn btn-outline" type="button" id="copyEmailBtn">Copy Email</button>
-        </div>
-        <div id="formStatus" style="margin-top:8px;color:var(--muted)"></div>
-      </form>
+    <section id="contact">
+      <h2>Contact</h2>
+      <div style="text-align:center;color:var(--muted);margin-bottom:12px">Let’s build something electrifying ⚡</div>
+      <div style="font-size:24px;display:flex;justify-content:center;gap:16px;margin-bottom:20px;">
+        <a href="https://github.com/yourusername" target="_blank" style="color:#fff"><i class="fa-brands fa-github"></i></a>
+        <a href="https://linkedin.com/in/yourusername" target="_blank" style="color:#0a66c2"><i class="fa-brands fa-linkedin"></i></a>
+        <a href="mailto:youremail@example.com" style="color:#e2eaf5"><i class="fa-solid fa-envelope"></i></a>
+      </div>
     </section>
 
-    <footer>
-      <div style="color:var(--muted)">© <span id="year"></span> Ryle L. De Hitta — Built with curiosity and code ⚡</div>
-    </footer>
+    <footer>© <span id="year"></span> Ryle L. De Hitta — Built with curiosity and code ⚡</footer>
   </main>
 
-  <!-- Scripts: Three.js background + UI + PWA SW (inline blob) -->
+  <!-- Upload Background Button -->
+  <button id="bgUpload" title="Change Background"><i class="fa-solid fa-image"></i></button>
+  <input type="file" id="bgFile" accept="image/*" style="display:none" />
+
   <script>
-  // --- small helpers & UI ---
-  document.getElementById('year').textContent = new Date().getFullYear();
+  document.getElementById('year').textContent=new Date().getFullYear();
 
-  // smooth scroll for anchor links
-  document.querySelectorAll('a[href^="#"]').forEach(a=>{
-    a.addEventListener('click', function(e){
-      const href = this.getAttribute('href');
-      const t = document.querySelector(href);
-      if(t){ e.preventDefault(); t.scrollIntoView({behavior:'smooth',block:'start'}); }
-    });
+  // === Upload background system ===
+  const uploadBtn=document.getElementById('bgUpload');
+  const bgFile=document.getElementById('bgFile');
+  uploadBtn.addEventListener('click',()=>bgFile.click());
+  bgFile.addEventListener('change',e=>{
+    const file=e.target.files[0];
+    if(file){
+      const reader=new FileReader();
+      reader.onload=function(evt){
+        document.body.style.backgroundImage=`url(${evt.target.result})`;
+        document.body.style.backgroundSize='cover';
+        document.body.style.backgroundAttachment='fixed';
+        document.body.style.backgroundBlendMode='overlay';
+      };
+      reader.readAsDataURL(file);
+    }
   });
 
-  // contact form: mailto fallback
-  const form = document.getElementById('contactForm');
-  const status = document.getElementById('formStatus');
-  form.addEventListener('submit', function(e){
-    e.preventDefault();
-    const fd = new FormData(form);
-    const name = fd.get('name')||'';
-    const email = fd.get('email')||'';
-    const msg = fd.get('message')||'';
-    const subject = encodeURIComponent('Portfolio contact from ' + name);
-    const body = encodeURIComponent('Email: ' + email + '\n\n' + msg);
-    const recipient = 'youremail@example.com'; // <-- replace with your email
-    window.location.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
-    status.textContent = 'Opening your mail client...';
-    setTimeout(()=> status.textContent = 'If your mail client did not open, copy the message and email directly.', 2800);
+  // === 3D grid + orbs ===
+  const canvas=document.getElementById('bg3d');
+  const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+  renderer.setSize(innerWidth,innerHeight);
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,1000);
+  camera.position.set(0,2,6);
+
+  const grid=new THREE.GridHelper(40,40,0xffffff,0x444444);
+  grid.material.opacity=0.3;grid.material.transparent=true;
+  scene.add(grid);
+
+  const orbGeo=new THREE.SphereGeometry(0.12,16,16);
+  const orbMat=new THREE.MeshStandardMaterial({color:0x888888,metalness:0.5,roughness:0.3});
+  const orbs=[];
+  for(let i=0;i<10;i++){
+    const orb=new THREE.Mesh(orbGeo,orbMat.clone());
+    orb.position.set((Math.random()-0.5)*8,Math.random()*3+1,(Math.random()-0.5)*8);
+    orb.userData.phase=Math.random()*Math.PI*2;
+    scene.add(orb);orbs.push(orb);
+  }
+
+  const light=new THREE.PointLight(0xffffff,1.2);
+  light.position.set(2,4,4);
+  scene.add(light);
+  const ambient=new THREE.AmbientLight(0x999999,0.4);
+  scene.add(ambient);
+
+  window.addEventListener('mousemove',e=>{
+    const x=(e.clientX/innerWidth-0.5)*2;
+    const y=(e.clientY/innerHeight-0.5)*2;
+    camera.position.x+=x*0.02;
+    camera.position.y+=-y*0.02;
   });
 
-  // copy email button
-  document.getElementById('copyEmailBtn').addEventListener('click', ()=>{
-    navigator.clipboard && navigator.clipboard.writeText('youremail@example.com').then(()=> {
-      alert('Email address copied to clipboard.');
-    }).catch(()=> alert('Copy failed — please copy manually.'));
-  });
+  function animate(){
+    requestAnimationFrame(animate);
+    grid.rotation.y+=0.0008;
+    orbs.forEach((o,i)=>{o.position.y=Math.sin(Date.now()*0.001+i)*1.5+2});
+    renderer.render(scene,camera);
+  }
+  animate();
 
-  // --- 3D SCI-FI GRID + ORBS (Three.js) ---
-  (function(){
-    // if small screen => disable heavy 3d and show subtle CSS background
-    const MOBILE_BREAKPOINT = 760;
-    if(window.innerWidth < MOBILE_BREAKPOINT || /Mobi|Android/i.test(navigator.userAgent)){
-      // hide canvas and early return
-      const c = document.getElementById('bg3d');
-      if(c) c.style.display = 'none';
-      return;
-    }
-
-    const canvas = document.getElementById('bg3d');
-    const renderer = new THREE.WebGLRenderer({canvas: canvas, antialias: true, alpha: true});
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(window.innerWidth, window.innerHeight);
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 2.2, 6);
-
-    // Grid floor (glowing lines)
-    const grid = new THREE.GridHelper(60, 60, 0x4f46e5, 0x11121a);
-    grid.material.opacity = 0.38;
-    grid.material.transparent = true;
-    scene.add(grid);
-
-    // create subtle glowing plane under grid (for depth)
-    const planeGeo = new THREE.PlaneGeometry(120, 120);
-    const planeMat = new THREE.MeshBasicMaterial({color:0x080816, side: THREE.DoubleSide});
-    const plane = new THREE.Mesh(planeGeo, planeMat);
-    plane.rotation.x = -Math.PI/2.05;
-    plane.position.y = -0.01;
-    scene.add(plane);
-
-    // floating orbs
-    const orbGeo = new THREE.SphereGeometry(0.12, 16, 16);
-    const orbMat = new THREE.MeshStandardMaterial({color:0x8b5cf6, emissive:0x332266, emissiveIntensity:0.9, metalness:0.2, roughness:0.4});
-    const orbs = [];
-    const ORB_COUNT = 14;
-    for(let i=0;i<ORB_COUNT;i++){
-      const orb = new THREE.Mesh(orbGeo, orbMat.clone());
-      orb.position.set((Math.random()-0.5)*12, Math.random()*4 + 0.6, (Math.random()-0.5)*12);
-      orb.scale.setScalar(Math.random()*0.9 + 0.6);
-      orb.userData = { speed: 0.6 + Math.random()*0.8, phase: Math.random()*Math.PI*2 };
-      scene.add(orb); orbs.push(orb);
-    }
-
-    // lights
-    const ambient = new THREE.AmbientLight(0x7c3aed, 0.25);
-    const point = new THREE.PointLight(0x6366f1, 1.2, 40);
-    point.position.set(0, 6, 2);
-    scene.add(ambient); scene.add(point);
-
-    // small soft rim light
-    const rim = new THREE.PointLight(0x9b7cfb, 0.35, 60);
-    rim.position.set(-6, 2, -6);
-    scene.add(rim);
-
-    // mouse parallax
-    const mouse = { x: 0, y: 0 };
-    window.addEventListener('mousemove', (e) => {
-      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = (e.clientY / window.innerHeight) * 2 - 1;
-    });
-
-    // animation loop
-    let last = performance.now();
-    function render(now){
-      const dt = (now - last) * 0.001;
-      last = now;
-
-      // animate orbs (floating)
-      orbs.forEach((o, i) => {
-        o.position.y = Math.sin(now * 0.001 * o.userData.speed + o.userData.phase) * 1.2 + 1.6;
-        o.rotation.y += 0.01 + i * 0.001;
-      });
-
-      // slow rotation on grid for subtle motion
-      grid.rotation.y += 0.0008;
-
-      // camera parallax (smooth)
-      camera.position.x += (mouse.x * 1.8 - camera.position.x) * 0.06;
-      camera.position.y += (-mouse.y * 0.8 + 2.2 - camera.position.y) * 0.06;
-      camera.lookAt(0,0,0);
-
-      renderer.render(scene, camera);
-      requestAnimationFrame(render);
-    }
-    requestAnimationFrame(render);
-
-    // responsive
-    window.addEventListener('resize', () => {
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-    });
-  })();
-
-  // --- Progressive Web App: inline service worker blob (simple offline) ---
-  if('serviceWorker' in navigator){
-    const sw = `
-      const CACHE = 'ryle-portfolio-v1';
-      const FILES = ['./'];
-      self.addEventListener('install', e => {
-        e.waitUntil(caches.open(CACHE).then(cache => cache.addAll(FILES)));
-        self.skipWaiting();
-      });
-      self.addEventListener('fetch', e => {
-        e.respondWith(caches.match(e.request).then(resp => resp || fetch(e.request)));
-      });
-      self.addEventListener('activate', e => {
-        e.waitUntil(caches.keys().then(keys => Promise.all(keys.map(k => k !== CACHE && caches.delete(k)))));
-      });
-    `;
-    const blob = new Blob([sw], { type: 'application/javascript' });
-    const swUrl = URL.createObjectURL(blob);
-    navigator.serviceWorker.register(swUrl).then(()=>console.log('✅ Service worker registered')).catch(e=>console.warn('SW failed', e));
+  // === Offline PWA service worker ===
+  if('serviceWorker'in navigator){
+    const sw=`const C='cache-v1';const F=['./'];self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(F)))});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)))});`;
+    const blob=new Blob([sw],{type:'application/javascript'});
+    const swURL=URL.createObjectURL(blob);
+    navigator.serviceWorker.register(swURL);
   }
   </script>
 </body>
   </html>
-            
+                             
